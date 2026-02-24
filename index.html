@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="color-scheme" content="light">
+  <title>AgroVentas Huevo</title>
+  
+  <!-- Tailwind CSS para el diseño -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome para los íconos (Sustituto de Lucide en HTML) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- React y ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel para compilar JSX en el navegador -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { 
+      background-color: #f3f4f6; 
+      color: #1f2937; /* Fuerza un color oscuro por defecto para evitar letras blancas */
+      font-family: system-ui, -apple-system, sans-serif; 
+    }
+    /* Animaciones suaves */
+    .animate-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <!-- Mensaje de respaldo por si el navegador bloquea los scripts -->
+    <div style="padding: 40px; text-align: center; font-family: sans-serif; color: #333; margin-top: 20vh;">
+      <h2>⏳ Cargando aplicación...</h2>
+      <p style="margin-top: 10px; color: #666;">Si esta pantalla no desaparece, comprueba tu conexión a internet. El archivo necesita descargar los íconos y el diseño la primera vez que se abre.</p>
+    </div>
+  </div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ==========================================
+    // ⚠️ CONFIGURACIÓN DE TU BASE DE DATOS ⚠️
+    // ==========================================
+    // Pega aquí la URL que te dio Google Apps Script en el Paso 1
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwikUirmOmbz23AheKIoeELWMTH14oAsB5m5N8SXp7yqj0UVyAbonY4TsQYQzb1M4kUOA/exec";
+    // ==========================================
+
+
+    // --- COMPONENTES UI REUTILIZABLES ---
+    const Button = ({ children, onClick, variant = 'primary', className = '', type = 'button', disabled = false }) => {
+      const baseStyle = "flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all duration-200 active:scale-95 disabled:opacity-70 disabled:active:scale-100";
+      const variants = {
+        primary: "bg-amber-500 text-white hover:bg-amber-600 shadow-sm",
+        secondary: "bg-amber-100 text-amber-800 hover:bg-amber-200",
+        outline: "border-2 border-gray-200 text-gray-700 hover:border-amber-500 hover:text-amber-600",
+      };
+      return (
+        <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`}>
+          {children}
+        </button>
+      );
+    };
+
+    const Input = ({ label, iconClass, ...props }) => (
+      <div className="flex flex-col gap-1.5 mb-4">
+        <label className="text-sm font-medium text-gray-700 ml-1">{label}</label>
+        <div className="relative">
+          {iconClass && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><i className={iconClass}></i></div>}
+          <input 
+            className={`w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all ${iconClass ? 'pl-10' : ''}`}
+            {...props}
+          />
+        </div>
+      </div>
+    );
+
+    const Select = ({ label, iconClass, options, ...props }) => (
+      <div className="flex flex-col gap-1.5 mb-4">
+        <label className="text-sm font-medium text-gray-700 ml-1">{label}</label>
+        <div className="relative">
+          {iconClass && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><i className={iconClass}></i></div>}
+          <select 
+            className={`w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none transition-all ${iconClass ? 'pl-10' : ''}`}
+            {...props}
+          >
+            <option value="" disabled>Selecciona una opción</option>
+            {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+            <i className="fa-solid fa-chevron-down text-sm"></i>
+          </div>
+        </div>
+      </div>
+    );
+
+    // --- APP PRINCIPAL ---
+    function App() {
+      const [prospects, setProspects] = useState([]);
+      const [currentView, setCurrentView] = useState('list'); 
+      const [selectedProspect, setSelectedProspect] = useState(null);
+      const [notification, setNotification] = useState(null);
+
+      const showNotification = (message, type = 'success') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 4000);
+      };
+
+      const handleSaveOrder = async (order, prospect) => {
+        try {
+          // Actualizar UI Localmente
+          const updatedProspects = prospects.map(p => {
+            if (p.id === prospect.id) {
+              return { ...p, orders: [order, ...(p.orders || [])] };
+            }
+            return p;
+          });
+          setProspects(updatedProspects);
+          setCurrentView('list');
+          showNotification('Enviando pedido a la nube...', 'warning');
+
+          // Enviar a Google Sheets
+          if (APPS_SCRIPT_URL !== "PEGAR_AQUI_TU_URL_DE_APPS_SCRIPT") {
+            const orderText = order.items.map(i => `${i.qty}x ${i.name}`).join(' | ');
+            const payload = {
+              action: 'add_order',
+              prospectId: prospect.id,
+              businessName: prospect.businessName,
+              orderDetails: `${order.totalItems} cajas en total: ` + orderText
+            };
+            
+            // Eliminamos mode: 'no-cors' para detectar errores de bloqueo reales
+            await fetch(APPS_SCRIPT_URL, {
+              method: 'POST',
+              body: JSON.stringify(payload)
+            });
+            showNotification('¡Pedido guardado en Google Sheets!', 'success');
+          } else {
+            showNotification('Pedido guardado (Solo localmente - Falta URL)', 'success');
+          }
+
+        } catch (error) {
+          console.error(error);
+          showNotification('Error al enviar a Google. Revisa tu Excel.', 'error');
+        }
+      };
+
+      const renderView = () => {
+        switch (currentView) {
+          case 'list':
+            return <ProspectList 
+                     prospects={prospects} 
+                     onAdd={() => setCurrentView('add')} 
+                     onSelect={(p) => { setSelectedProspect(p); setCurrentView('detail'); }} 
+                     onDirectOrder={(p) => { setSelectedProspect(p); setCurrentView('order'); }}
+                   />;
+          case 'add':
+            return <AddProspect 
+                     onSave={async (prospect) => {
+                       // Actualizar Local
+                       setProspects([prospect, ...prospects]);
+                       setCurrentView('list');
+                       showNotification('Subiendo datos y foto a Google Drive...', 'warning');
+                       
+                       // Subir a la Nube (Google Script)
+                       if (APPS_SCRIPT_URL !== "PEGAR_AQUI_TU_URL_DE_APPS_SCRIPT") {
+                          try {
+                            const payload = { action: 'add_prospect', ...prospect };
+                            await fetch(APPS_SCRIPT_URL, {
+                              method: 'POST',
+                              body: JSON.stringify(payload)
+                            });
+                            showNotification('¡Prospecto subido a Google exitosamente!', 'success');
+                          } catch (e) {
+                            console.error(e);
+                            showNotification('Bloqueo de red. Verifica la consola.', 'error');
+                          }
+                       } else {
+                         showNotification('Guardado local (Configura tu URL de Apps Script)', 'success');
+                       }
+                     }}
+                     onCancel={() => setCurrentView('list')}
+                     showNotification={showNotification}
+                   />;
+          case 'detail':
+            return <ProspectDetail 
+                     prospect={selectedProspect} 
+                     onBack={() => setCurrentView('list')}
+                     onNewOrder={() => setCurrentView('order')}
+                   />;
+          case 'order':
+            return <AddOrder 
+                     prospect={selectedProspect}
+                     onSave={(order) => handleSaveOrder(order, selectedProspect)}
+                     onCancel={() => setCurrentView('list')}
+                   />;
+          default:
+            return <ProspectList prospects={prospects} onAdd={() => setCurrentView('add')} />;
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex justify-center text-gray-900">
+          <div className="w-full max-w-md bg-white shadow-2xl relative flex flex-col h-screen overflow-hidden">
+            
+            {/* Cabecera */}
+            <header className="bg-amber-500 text-white px-4 py-4 shadow-md z-10 flex-shrink-0 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="bg-white text-amber-500 w-8 h-8 rounded-lg flex items-center justify-center">
+                  <i className="fa-solid fa-box text-lg"></i>
+                </div>
+                <h1 className="text-xl font-bold tracking-tight">AgroVentas</h1>
+              </div>
+              {currentView === 'list' && (
+                <div className="text-amber-100 text-sm font-medium">
+                  {prospects.length} {prospects.length === 1 ? 'Cliente' : 'Clientes'}
+                </div>
+              )}
+            </header>
+
+            {/* Notificaciones */}
+            {notification && (
+              <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 w-[90%] animate-in">
+                <div className={`px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 ${
+                  notification.type === 'success' ? 'bg-green-600 text-white' : 
+                  notification.type === 'warning' ? 'bg-amber-500 text-white' : 'bg-red-500 text-white'
+                }`}>
+                  <i className={`fa-solid ${notification.type === 'success' ? 'fa-circle-check' : notification.type === 'warning' ? 'fa-cloud-arrow-up animate-pulse' : 'fa-circle-exclamation'} text-xl`}></i>
+                  <span className="font-medium text-sm leading-tight">{notification.message}</span>
+                </div>
+              </div>
+            )}
+
+            <main className="flex-1 overflow-y-auto bg-gray-50">
+              {renderView()}
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    // --- VISTA: LISTA DE PROSPECTOS ---
+    const ProspectList = ({ prospects, onAdd, onSelect, onDirectOrder }) => {
+      return (
+        <div className="p-4 pb-24 h-full animate-in">
+          {prospects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-4 mt-20 opacity-80">
+              <div className="w-24 h-24 bg-amber-100 rounded-full flex items-center justify-center mb-4 text-amber-500 text-4xl">
+                <i className="fa-solid fa-users"></i>
+              </div>
+              <h2 className="text-xl font-bold text-gray-700 mb-2">Sin prospectos aún</h2>
+              <p className="text-gray-500 mb-8 max-w-[250px]">
+                Registra tu primer cliente, captura su foto y levanta su primer pedido.
+              </p>
+              <Button onClick={onAdd} className="px-8 shadow-amber-500/30 shadow-lg">
+                <i className="fa-solid fa-user-plus"></i> Registrar Cliente
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-between items-end mb-2 px-1">
+                <h2 className="font-bold text-gray-800">Mi Ruta (Clientes)</h2>
+              </div>
+              
+              {prospects.map(prospect => (
+                <div 
+                  key={prospect.id} 
+                  onClick={() => onSelect(prospect)}
+                  className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 active:scale-[0.98] transition-transform cursor-pointer"
+                >
+                  <div className="w-16 h-16 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center border border-gray-200">
+                    {prospect.photoBase64 ? (
+                      <img src={prospect.photoBase64} alt="Negocio" className="w-full h-full object-cover" />
+                    ) : (
+                      <i className="fa-solid fa-shop text-2xl text-gray-400"></i>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0 py-1">
+                    <h3 className="font-bold text-gray-900 truncate">{prospect.businessName}</h3>
+                    <p className="text-sm text-gray-500 truncate flex items-center gap-1 mt-0.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+                      {prospect.businessType}
+                    </p>
+                    <div className="flex gap-2 mt-1.5">
+                      {prospect.orders && prospect.orders.length > 0 && (
+                        <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <i className="fa-solid fa-box text-[10px]"></i> {prospect.orders.length} pedidos
+                        </span>
+                      )}
+                      {prospect.location && (
+                        <span className="text-xs font-medium text-blue-600 flex items-center gap-1">
+                          <i className="fa-solid fa-location-dot text-[10px]"></i> GPS OK
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onDirectOrder(prospect); }}
+                    className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center hover:bg-amber-100 transition-colors flex-shrink-0"
+                  >
+                    <i className="fa-solid fa-cart-shopping text-xl"></i>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button 
+            onClick={onAdd}
+            className="fixed bottom-6 right-6 w-14 h-14 bg-amber-500 rounded-full shadow-lg shadow-amber-500/40 flex items-center justify-center text-white hover:bg-amber-600 active:scale-90 transition-all z-20"
+          >
+            <i className="fa-solid fa-plus text-2xl"></i>
+          </button>
+        </div>
+      );
+    };
+
+    // --- VISTA: AGREGAR PROSPECTO ---
+    const AddProspect = ({ onSave, onCancel, showNotification }) => {
+      const [formData, setFormData] = useState({ contactName: '', businessName: '', phone: '', businessType: '' });
+      const [location, setLocation] = useState(null);
+      const [locating, setLocating] = useState(false);
+      const [photoBase64, setPhotoBase64] = useState(null);
+      const [isSaving, setIsSaving] = useState(false);
+      const fileInputRef = useRef(null);
+
+      const businessTypes = [
+        { value: 'Abarrotería', label: 'Abarrotería / Miscelánea' },
+        { value: 'Restaurante', label: 'Restaurante / Comedor' },
+        { value: 'Panadería', label: 'Panadería / Pastelería' },
+        { value: 'Mercado', label: 'Puesto de Mercado' },
+        { value: 'Supermercado', label: 'Supermercado / Mini-súper' },
+        { value: 'Otro', label: 'Otro' },
+      ];
+
+      const handleGetLocation = () => {
+        setLocating(true);
+        if (!navigator.geolocation) {
+          showNotification("GPS no soportado en este dispositivo", "error");
+          setLocating(false); return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+            setLocating(false);
+            showNotification("Ubicación exacta capturada", "success");
+          },
+          (error) => {
+            setLocating(false);
+            let msg = "Error al obtener ubicación.";
+            if (error.code === 1) msg = "Permiso de GPS denegado. Revisa tus ajustes.";
+            if (error.code === 2) msg = "Señal de GPS no disponible.";
+            if (error.code === 3) msg = "Tiempo agotado buscando señal GPS.";
+            showNotification(msg, "error");
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+      };
+
+      const handlePhotoCapture = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          showNotification("Comprimiendo foto...", "warning");
+          const reader = new FileReader();
+          reader.onloadend = () => { 
+            const img = new Image();
+            img.src = reader.result;
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const MAX_WIDTH = 800; // Comprimir la imagen para que Google Sheets no la rechace
+              let width = img.width;
+              let height = img.height;
+              
+              if (width > MAX_WIDTH) {
+                height = Math.round((height * MAX_WIDTH) / width);
+                width = MAX_WIDTH;
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+              
+              // Guardar la imagen optimizada (jpeg al 60% de calidad)
+              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+              setPhotoBase64(compressedBase64); 
+              showNotification("Fotografía lista", "success"); 
+            };
+          };
+          reader.onerror = () => showNotification("Error al leer imagen", "error");
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!formData.businessName || !formData.businessType) {
+          showNotification('Nombre y tipo de negocio obligatorios', 'error'); return;
+        }
+        setIsSaving(true);
+        const newProspect = {
+          id: Date.now().toString(),
+          ...formData,
+          location,
+          photoBase64, // Enviamos el Base64 completo
+          createdAt: new Date().toISOString(),
+          orders: []
+        };
+        onSave(newProspect);
+      };
+
+      return (
+        <div className="flex flex-col h-full bg-white animate-in">
+          <div className="px-4 py-3 border-b flex items-center gap-3 bg-white sticky top-0 z-10 shadow-sm">
+            <button onClick={onCancel} className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600 transition-colors">
+              <i className="fa-solid fa-arrow-left text-xl"></i>
+            </button>
+            <h2 className="text-lg font-bold text-gray-800">Nuevo Cliente</h2>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-2 pb-24">
+            <div className="mb-2">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Datos del Negocio</h3>
+              <Input label="Nombre del Negocio *" iconClass="fa-solid fa-shop" placeholder="Ej. Abarrotes Doña Mary" value={formData.businessName} onChange={(e) => setFormData({...formData, businessName: e.target.value})} required />
+              <Select label="Tipo de Negocio *" iconClass="fa-solid fa-circle-info" options={businessTypes} value={formData.businessType} onChange={(e) => setFormData({...formData, businessType: e.target.value})} required />
+            </div>
+
+            <div className="mb-2">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 mt-2">Contacto</h3>
+              <Input label="Encargado/Dueño" iconClass="fa-solid fa-user-plus" placeholder="Ej. María López" value={formData.contactName} onChange={(e) => setFormData({...formData, contactName: e.target.value})} />
+              <Input label="Teléfono (WhatsApp)" type="tel" iconClass="fa-solid fa-phone" placeholder="10 dígitos" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+            </div>
+
+            <div className="mb-4">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 mt-2">Evidencia y Ubicación</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div onClick={handleGetLocation} className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-colors h-32 ${location ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-300 bg-gray-50 text-gray-500'}`}>
+                  <i className={`fa-solid fa-location-dot text-3xl ${location ? 'text-green-500' : 'text-gray-400'}`}></i>
+                  <span className="text-sm font-medium">{locating ? 'Buscando...' : location ? 'GPS Guardado' : 'Capturar GPS'}</span>
+                  {location && <i className="fa-solid fa-circle-check absolute top-2 right-2 text-green-500"></i>}
+                </div>
+
+                <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer overflow-hidden relative h-32">
+                  {photoBase64 ? (
+                    <>
+                      <img src={photoBase64} alt="Fachada" className="w-full h-full object-cover absolute inset-0 opacity-80" />
+                      <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white p-2">
+                        <i className="fa-solid fa-camera text-2xl mb-1"></i>
+                        <span className="text-xs font-medium">Cambiar</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-4 flex flex-col items-center justify-center text-gray-500 gap-2">
+                      <i className="fa-solid fa-camera text-3xl text-gray-400"></i>
+                      <span className="text-sm font-medium">Abrir Cámara</span>
+                    </div>
+                  )}
+                </div>
+                <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" capture="environment" onChange={handlePhotoCapture} />
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t bg-white sticky bottom-0 z-10">
+              <Button type="submit" disabled={isSaving} className="w-full text-lg py-3.5 shadow-amber-500/25 shadow-lg">
+                {isSaving ? 'Guardando en la Nube...' : 'Guardar Prospecto'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      );
+    };
+
+    // --- VISTA: DETALLE DEL PROSPECTO ---
+    const ProspectDetail = ({ prospect, onBack, onNewOrder }) => {
+      if (!prospect) return null;
+      return (
+        <div className="flex flex-col h-full bg-gray-50 animate-in">
+          <div className="relative h-48 bg-gray-800 flex-shrink-0">
+            {prospect.photoBase64 ? (
+              <img src={prospect.photoBase64} className="w-full h-full object-cover opacity-60 mix-blend-overlay" />
+            ) : (
+              <div className="w-full h-full bg-amber-600 flex items-center justify-center opacity-80">
+                <i className="fa-solid fa-shop text-6xl text-white opacity-20"></i>
+              </div>
+            )}
+            <div className="absolute top-0 left-0 w-full p-4 flex items-center justify-between text-white z-10">
+              <button onClick={onBack} className="p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/40 transition">
+                <i className="fa-solid fa-arrow-left text-xl"></i>
+              </button>
+            </div>
+            <div className="absolute bottom-0 left-0 w-full p-5 bg-gradient-to-t from-black/90 to-transparent text-white pt-12">
+              <div className="inline-block px-2 py-1 bg-amber-500 text-xs font-bold rounded mb-2">{prospect.businessType}</div>
+              <h2 className="text-2xl font-bold leading-tight">{prospect.businessName}</h2>
+            </div>
+          </div>
+
+          <div className="p-5 flex-1 flex flex-col gap-6 -mt-4 bg-gray-50 rounded-t-3xl relative z-20">
+            <div className="grid grid-cols-2 gap-3">
+              <Button onClick={onNewOrder} className="shadow-md shadow-amber-500/20 py-4">
+                <i className="fa-solid fa-cart-shopping"></i> Levantar Pedido
+              </Button>
+              <Button variant="outline" className="bg-white py-4" disabled={!prospect.location}
+                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${prospect.location.lat},${prospect.location.lng}`)}>
+                <i className="fa-solid fa-map"></i> Ir en Maps
+              </Button>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Información</h3>
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><i className="fa-solid fa-users"></i></div>
+                <div><p className="text-xs text-gray-500 font-medium">Encargado</p><p className="font-semibold">{prospect.contactName || 'N/A'}</p></div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 flex-shrink-0"><i className="fa-solid fa-phone"></i></div>
+                <div className="flex-1"><p className="text-xs text-gray-500 font-medium">Teléfono</p><p className="font-semibold">{prospect.phone || 'N/A'}</p></div>
+                {prospect.phone && <a href={`tel:${prospect.phone}`} className="p-2 bg-gray-100 rounded-lg text-gray-600"><i className="fa-solid fa-phone"></i></a>}
+              </div>
+            </div>
+
+            <div className="pb-10">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Historial</h3>
+              {(!prospect.orders || prospect.orders.length === 0) ? (
+                <div className="bg-white rounded-2xl p-6 text-center border border-gray-100 shadow-sm">
+                  <i className="fa-solid fa-box-open text-3xl text-gray-300 mb-2"></i>
+                  <p className="text-gray-500 text-sm">Sin pedidos aún.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {prospect.orders.map((order, idx) => (
+                    <div key={idx} className="bg-white p-4 rounded-2xl shadow-sm border border-l-4 border-l-amber-500">
+                      <div className="flex justify-between items-center mb-2 border-b pb-2">
+                        <span className="text-sm font-semibold">{new Date(order.date).toLocaleDateString()}</span>
+                        <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-md">{order.totalItems} cajas</span>
+                      </div>
+                      <ul className="text-sm text-gray-600 space-y-1 mt-2">
+                        {order.items.map((item, i) => (
+                          <li key={i} className="flex justify-between"><span>{item.name}</span><span className="font-bold">{item.qty}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // --- VISTA: LEVANTAR PEDIDO ---
+    const AddOrder = ({ prospect, onSave, onCancel }) => {
+      const catalog = [
+        { id: 'b_g', name: 'Blanco - Grande', color: 'bg-white border-gray-200' },
+        { id: 'b_m', name: 'Blanco - Mediano', color: 'bg-white border-gray-200' },
+        { id: 'r_g', name: 'Rojo - Grande', color: 'bg-red-50 border-red-200 text-red-900' },
+      ];
+      const [cart, setCart] = useState(catalog.map(p => ({ ...p, qty: 0 })));
+      
+      const updateQty = (id, delta) => setCart(cart.map(item => item.id === id ? { ...item, qty: Math.max(0, item.qty + delta) } : item));
+      const totalCajas = cart.reduce((sum, item) => sum + item.qty, 0);
+
+      const handleSave = () => {
+        if (totalCajas === 0) return;
+        onSave({
+          date: new Date().toISOString(),
+          items: cart.filter(i => i.qty > 0).map(i => ({ name: i.name, qty: i.qty })),
+          totalItems: totalCajas
+        });
+      };
+
+      return (
+        <div className="flex flex-col h-full bg-gray-50 animate-in">
+          <div className="px-4 py-4 border-b flex flex-col gap-1 bg-white sticky top-0 z-10 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <button onClick={onCancel} className="p-1 -ml-1 rounded-full hover:bg-gray-100"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+              <h2 className="text-lg font-bold">Nuevo Pedido</h2>
+            </div>
+            <p className="text-sm text-gray-600 font-medium ml-9 bg-gray-100 self-start px-2 py-1 rounded-md">
+              <i className="fa-solid fa-shop"></i> {prospect?.businessName}
+            </p>
+          </div>
+
+          <div className="p-4 flex-1">
+            <div className="flex flex-col gap-3 mt-2">
+              {cart.map(item => (
+                <div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl border shadow-sm ${item.color}`}>
+                  <div className="font-bold text-sm max-w-[50%]">{item.name}</div>
+                  <div className="flex items-center bg-white rounded-lg border shadow-sm overflow-hidden">
+                    <button onClick={() => updateQty(item.id, -1)} className="w-12 h-12 text-2xl font-bold bg-gray-50 active:bg-gray-200" disabled={item.qty===0}>-</button>
+                    <div className="w-12 h-12 flex items-center justify-center font-bold text-xl border-x">{item.qty}</div>
+                    <button onClick={() => updateQty(item.id, 1)} className="w-12 h-12 text-2xl font-bold text-amber-600 bg-gray-50 active:bg-amber-100">+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white border-t p-4 pb-6">
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-gray-500 font-medium">Total:</span>
+              <span className="text-2xl font-black text-amber-600">{totalCajas} <span className="text-sm">cajas</span></span>
+            </div>
+            <Button onClick={handleSave} disabled={totalCajas === 0} className="w-full text-lg py-4">Confirmar Pedido</Button>
+          </div>
+        </div>
+      );
+    };
+
+    // Renderizar la App
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

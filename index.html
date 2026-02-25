@@ -99,7 +99,28 @@
 
     // --- APP PRINCIPAL ---
     function App() {
-      const [prospects, setProspects] = useState([]);
+      // INICIO DEL CAMBIO: Leer datos guardados al abrir la app
+      const [prospects, setProspects] = useState(() => {
+        try {
+          const savedData = localStorage.getItem('agroventas_data');
+          return savedData ? JSON.parse(savedData) : [];
+        } catch (error) {
+          return [];
+        }
+      });
+
+      // INICIO DEL CAMBIO: Guardar automáticamente en el celular cada que haya un cambio
+      useEffect(() => {
+        try {
+          localStorage.setItem('agroventas_data', JSON.stringify(prospects));
+        } catch (error) {
+          // Si se llena la memoria de 5MB del navegador, guardamos todo pero sin las fotos locales (que pesan más)
+          console.warn("Memoria local llena, guardando versión ligera...");
+          const prospectsWithoutPhotos = prospects.map(p => ({ ...p, photoBase64: null }));
+          localStorage.setItem('agroventas_data', JSON.stringify(prospectsWithoutPhotos));
+        }
+      }, [prospects]);
+
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProspect, setSelectedProspect] = useState(null);
       const [notification, setNotification] = useState(null);

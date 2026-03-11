@@ -577,9 +577,11 @@
     // --- VISTA: LEVANTAR PEDIDO ---
     const AddOrder = ({ prospect, onSave, onCancel }) => {
       const catalog = [
-        { id: 'b_g', name: 'Blanco - Grande', color: 'bg-white border-gray-200' },
-        { id: 'b_m', name: 'Blanco - Mediano', color: 'bg-white border-gray-200' },
-        { id: 'r_g', name: 'Rojo - Grande', color: 'bg-red-50 border-red-200 text-red-900' },
+        { id: 'b_g', name: 'Blanco - Jumbo', color: 'bg-white border-gray-200' },
+        { id: 'b_m', name: 'Blanco - Normal', color: 'bg-white border-gray-200' },
+        { id: 'r_g', name: 'Rojo - Jumbo', color: 'bg-red-50 border-red-200 text-red-900' },
+        { id: 'r_g', name: 'Rojo - Normal', color: 'bg-red-50 border-red-200 text-red-900' },
+        { id: 'r_g', name: 'Pinto - Normal', color: 'bg-red-50 border-red-200 text-red-900' },
       ];
       const [cart, setCart] = useState(catalog.map(p => ({ ...p, qty: 0 })));
       
@@ -638,4 +640,5 @@
     root.render(<App />);
   </script>
 </body>
+
 </html>

@@ -343,7 +343,7 @@
 
     // --- VISTA: AGREGAR PROSPECTO ---
     const AddProspect = ({ onSave, onCancel, showNotification }) => {
-      const [formData, setFormData] = useState({ contactName: '', businessName: '', phone: '', businessType: '' });
+      const [formData, setFormData] = useState({ contactName: '', businessName: '', phone: '', businessType: '', addressNotes: '' });
       const [location, setLocation] = useState(null);
       const [locating, setLocating] = useState(false);
       const [photoBase64, setPhotoBase64] = useState(null);
@@ -457,6 +457,11 @@
               <Input label="Teléfono (WhatsApp)" type="tel" iconClass="fa-solid fa-phone" placeholder="10 dígitos" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
             </div>
 
+            <div className="mb-2">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 mt-2">Ubicación Escrita</h3>
+              <Input label="Dirección / Referencias" iconClass="fa-solid fa-map-location-dot" placeholder="Ej. Mercado local 12, pasillo 3" value={formData.addressNotes} onChange={(e) => setFormData({...formData, addressNotes: e.target.value})} />
+            </div>
+
             <div className="mb-4">
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 mt-2">Evidencia y Ubicación</h3>
               <div className="grid grid-cols-2 gap-3">
@@ -537,11 +542,17 @@
                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><i className="fa-solid fa-users"></i></div>
                 <div><p className="text-xs text-gray-500 font-medium">Encargado</p><p className="font-semibold">{prospect.contactName || 'N/A'}</p></div>
               </div>
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 mb-3">
                 <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 flex-shrink-0"><i className="fa-solid fa-phone"></i></div>
                 <div className="flex-1"><p className="text-xs text-gray-500 font-medium">Teléfono</p><p className="font-semibold">{prospect.phone || 'N/A'}</p></div>
                 {prospect.phone && <a href={`tel:${prospect.phone}`} className="p-2 bg-gray-100 rounded-lg text-gray-600"><i className="fa-solid fa-phone"></i></a>}
               </div>
+              {prospect.addressNotes && (
+                <div className="flex items-start gap-3 border-t pt-3 mt-1 border-gray-100">
+                  <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0"><i className="fa-solid fa-map-location-dot"></i></div>
+                  <div className="flex-1"><p className="text-xs text-gray-500 font-medium">Dirección / Referencias</p><p className="font-semibold text-sm">{prospect.addressNotes}</p></div>
+                </div>
+              )}
             </div>
 
             <div className="pb-10">
@@ -581,7 +592,7 @@
         { id: 'b_m', name: 'Blanco - Normal', color: 'bg-white border-gray-200' },
         { id: 'r_g', name: 'Rojo - Jumbo', color: 'bg-red-50 border-red-200 text-red-900' },
         { id: 'r_g', name: 'Rojo - Normal', color: 'bg-red-50 border-red-200 text-red-900' },
-        { id: 'r_g', name: 'Pinto - Normal', color: 'bg-red-50 border-red-200 text-red-900' },
+        { id: 'r_g', name: 'Pinto - Normal', color: 'bg-red-50 border-red-200 text-red-800' },
       ];
       const [cart, setCart] = useState(catalog.map(p => ({ ...p, qty: 0 })));
       
@@ -640,5 +651,4 @@
     root.render(<App />);
   </script>
 </body>
-
 </html>

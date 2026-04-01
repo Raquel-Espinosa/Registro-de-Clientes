@@ -439,7 +439,7 @@
           }
 
           // 2. Validar en Google Sheets (La Nube)
-          if (APPS_SCRIPT_URL && APPS_SCRIPT_URL !== "PEGAR_AQUI_TU_URL_DE_APPS_SCRIPT") {
+          if (APPS_SCRIPT_URL && APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbypCWEjWA156Il5vdTy0S2cuV_fEUyvCR6S8aqoh6B4-YLW72by7ez0cKYrOE7iJacc0Q/exec") {
             try {
               showNotification('Verificando base de datos central...', 'warning');
               const checkUrl = `${APPS_SCRIPT_URL}?action=check_phone&phone=${encodeURIComponent(formData.phone)}`;

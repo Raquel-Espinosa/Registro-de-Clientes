@@ -144,7 +144,7 @@
           showNotification('Enviando pedido a la nube...', 'warning');
 
           // Enviar a Google Sheets
-          if (APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbypCWEjWA156Il5vdTy0S2cuV_fEUyvCR6S8aqoh6B4-YLW72by7ez0cKYrOE7iJacc0Q/exec") {
+          if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith("http")) {
             const orderText = order.items.map(i => `${i.qty}x ${i.name}`).join(' | ');
             const payload = {
               action: 'add_order',
@@ -188,7 +188,7 @@
                        showNotification('Subiendo datos y foto a Google Drive...', 'warning');
                        
                        // Subir a la Nube (Google Script)
-                       if (APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbypCWEjWA156Il5vdTy0S2cuV_fEUyvCR6S8aqoh6B4-YLW72by7ez0cKYrOE7iJacc0Q/exec") {
+                       if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith("http")) {
                           try {
                             const payload = { action: 'add_prospect', ...prospect };
                             await fetch(APPS_SCRIPT_URL, {
@@ -439,7 +439,7 @@
           }
 
           // 2. Validar en Google Sheets (La Nube)
-          if (APPS_SCRIPT_URL && APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbypCWEjWA156Il5vdTy0S2cuV_fEUyvCR6S8aqoh6B4-YLW72by7ez0cKYrOE7iJacc0Q/exec") {
+          if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith("http")) {
             try {
               showNotification('Verificando base de datos central...', 'warning');
               const checkUrl = `${APPS_SCRIPT_URL}?action=check_phone&phone=${encodeURIComponent(formData.phone)}`;

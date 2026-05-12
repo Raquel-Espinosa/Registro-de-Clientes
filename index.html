@@ -9,7 +9,7 @@
   <!-- Tailwind CSS para el diseño -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- FontAwesome para los íconos (Sustituto de Lucide en HTML) -->
+  <!-- FontAwesome para los íconos -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <!-- React y ReactDOM -->
@@ -22,20 +22,19 @@
   <style>
     body { 
       background-color: #f3f4f6; 
-      color: #1f2937; /* Fuerza un color oscuro por defecto para evitar letras blancas */
+      color: #1f2937;
       font-family: system-ui, -apple-system, sans-serif; 
     }
-    /* Animaciones suaves */
     .animate-in { animation: fadeIn 0.3s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
   <div id="root">
-    <!-- Mensaje de respaldo por si el navegador bloquea los scripts -->
+    <!-- Mensaje de respaldo por si tarda en cargar -->
     <div style="padding: 40px; text-align: center; font-family: sans-serif; color: #333; margin-top: 20vh;">
       <h2>⏳ Cargando aplicación...</h2>
-      <p style="margin-top: 10px; color: #666;">Si esta pantalla no desaparece, comprueba tu conexión a internet. El archivo necesita descargar los íconos y el diseño la primera vez que se abre.</p>
+      <p style="margin-top: 10px; color: #666;">Si esta pantalla no desaparece, comprueba tu conexión a internet.</p>
     </div>
   </div>
 
@@ -45,10 +44,9 @@
     // ==========================================
     // ⚠️ CONFIGURACIÓN DE TU BASE DE DATOS ⚠️
     // ==========================================
-    // Pega aquí la URL que te dio Google Apps Script en el Paso 1
+    // Pega aquí la URL que te dio Google Apps Script
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbypCWEjWA156Il5vdTy0S2cuV_fEUyvCR6S8aqoh6B4-YLW72by7ez0cKYrOE7iJacc0Q/exec";
     // ==========================================
-
 
     // --- COMPONENTES UI REUTILIZABLES ---
     const Button = ({ children, onClick, variant = 'primary', className = '', type = 'button', disabled = false }) => {
@@ -99,7 +97,7 @@
 
     // --- APP PRINCIPAL ---
     function App() {
-      // INICIO DEL CAMBIO: Leer datos guardados al abrir la app
+      // Cargar datos locales al inicio
       const [prospects, setProspects] = useState(() => {
         try {
           const savedData = localStorage.getItem('agroventas_data');
@@ -109,12 +107,11 @@
         }
       });
 
-      // INICIO DEL CAMBIO: Guardar automáticamente en el celular cada que haya un cambio
+      // Guardar datos locales en cada cambio
       useEffect(() => {
         try {
           localStorage.setItem('agroventas_data', JSON.stringify(prospects));
         } catch (error) {
-          // Si se llena la memoria de 5MB del navegador, guardamos todo pero sin las fotos locales (que pesan más)
           console.warn("Memoria local llena, guardando versión ligera...");
           const prospectsWithoutPhotos = prospects.map(p => ({ ...p, photoBase64: null }));
           localStorage.setItem('agroventas_data', JSON.stringify(prospectsWithoutPhotos));
@@ -132,7 +129,6 @@
 
       const handleSaveOrder = async (order, prospect) => {
         try {
-          // Actualizar UI Localmente
           const updatedProspects = prospects.map(p => {
             if (p.id === prospect.id) {
               return { ...p, orders: [order, ...(p.orders || [])] };
@@ -143,17 +139,16 @@
           setCurrentView('list');
           showNotification('Enviando pedido a la nube...', 'warning');
 
-          // Enviar a Google Sheets
           if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith("http")) {
             const orderText = order.items.map(i => `${i.qty}x ${i.name}`).join(' | ');
             const payload = {
               action: 'add_order',
               prospectId: prospect.id,
               businessName: prospect.businessName,
-              orderDetails: `${order.totalItems} cajas en total: ` + orderText
+              orderDetails: `${order.totalItems} cajas en total: ` + orderText,
+              deliveryDate: order.deliveryDate
             };
             
-            // Eliminamos mode: 'no-cors' para detectar errores de bloqueo reales
             await fetch(APPS_SCRIPT_URL, {
               method: 'POST',
               body: JSON.stringify(payload)
@@ -182,12 +177,10 @@
             return <AddProspect 
                      prospects={prospects}
                      onSave={async (prospect) => {
-                       // Actualizar Local
                        setProspects([prospect, ...prospects]);
                        setCurrentView('list');
-                       showNotification('Subiendo datos y foto a Google Drive...', 'warning');
+                       showNotification('Subiendo datos y foto a la nube...', 'warning');
                        
-                       // Subir a la Nube (Google Script)
                        if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith("http")) {
                           try {
                             const payload = { action: 'add_prospect', ...prospect };
@@ -227,8 +220,6 @@
       return (
         <div className="min-h-screen flex justify-center text-gray-900">
           <div className="w-full max-w-md bg-white shadow-2xl relative flex flex-col h-screen overflow-hidden">
-            
-            {/* Cabecera */}
             <header className="bg-amber-500 text-white px-4 py-4 shadow-md z-10 flex-shrink-0 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="bg-white text-amber-500 w-8 h-8 rounded-lg flex items-center justify-center">
@@ -243,7 +234,6 @@
               )}
             </header>
 
-            {/* Notificaciones */}
             {notification && (
               <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 w-[90%] animate-in">
                 <div className={`px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 ${
@@ -396,7 +386,7 @@
             img.src = reader.result;
             img.onload = () => {
               const canvas = document.createElement('canvas');
-              const MAX_WIDTH = 800; // Comprimir la imagen para que Google Sheets no la rechace
+              const MAX_WIDTH = 800; 
               let width = img.width;
               let height = img.height;
               
@@ -409,7 +399,6 @@
               const ctx = canvas.getContext('2d');
               ctx.drawImage(img, 0, 0, width, height);
               
-              // Guardar la imagen optimizada (jpeg al 60% de calidad)
               const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
               setPhotoBase64(compressedBase64); 
               showNotification("Fotografía lista", "success"); 
@@ -428,9 +417,7 @@
         
         setIsSaving(true);
         
-        // --- VALIDACIÓN DE TELÉFONO EN LA NUBE (GOOGLE SHEETS) ---
         if (formData.phone) {
-          // 1. Validar localmente en el celular primero
           const isDuplicateLocal = prospects.some(p => p.phone === formData.phone);
           if (isDuplicateLocal) {
             showNotification('Ese cliente ya está registrado en tu celular', 'error');
@@ -438,7 +425,6 @@
             return;
           }
 
-          // 2. Validar en Google Sheets (La Nube)
           if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith("http")) {
             try {
               showNotification('Verificando base de datos central...', 'warning');
@@ -453,7 +439,6 @@
               }
             } catch (error) {
               console.warn("Modo sin conexión o error de red", error);
-              // Si no hay internet, dejamos que se guarde localmente para no bloquear al vendedor
             }
           }
         }
@@ -462,7 +447,7 @@
           id: Date.now().toString(),
           ...formData,
           location,
-          photoBase64, // Enviamos el Base64 completo
+          photoBase64,
           createdAt: new Date().toISOString(),
           orders: []
         };
@@ -533,7 +518,6 @@
                   )}
                 </div>
                 
-                {/* Inputs ocultos para Cámara y Galería */}
                 <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" capture="environment" onChange={handlePhotoCapture} />
                 <input type="file" ref={galleryInputRef} style={{ display: 'none' }} accept="image/*" onChange={handlePhotoCapture} />
               </div>
@@ -614,10 +598,17 @@
                 <div className="flex flex-col gap-3">
                   {prospect.orders.map((order, idx) => (
                     <div key={idx} className="bg-white p-4 rounded-2xl shadow-sm border border-l-4 border-l-amber-500">
-                      <div className="flex justify-between items-center mb-2 border-b pb-2">
+                      <div className="flex justify-between items-center mb-1 border-b pb-2">
                         <span className="text-sm font-semibold">{new Date(order.date).toLocaleDateString()}</span>
                         <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-md">{order.totalItems} cajas</span>
                       </div>
+                      
+                      {order.deliveryDate && (
+                        <div className="text-xs font-medium text-blue-600 bg-blue-50 inline-flex items-center gap-1 px-2 py-1 rounded mb-1 mt-1">
+                          <i className="fa-solid fa-calendar-day"></i> Entrega: {order.deliveryDate}
+                        </div>
+                      )}
+
                       <ul className="text-sm text-gray-600 space-y-1 mt-2">
                         {order.items.map((item, i) => (
                           <li key={i} className="flex justify-between"><span>{item.name}</span><span className="font-bold">{item.qty}</span></li>
@@ -642,7 +633,14 @@
         { id: 'r_m', name: 'Rojo - Mediano', color: 'bg-red-50 border-red-200 text-red-900' },
         { id: 'pinto', name: 'Huevo Pinto', color: 'bg-orange-50 border-orange-200 text-orange-900' },
       ];
+      
       const [cart, setCart] = useState(catalog.map(p => ({ ...p, qty: 0 })));
+      
+      const [deliveryDate, setDeliveryDate] = useState(() => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+      });
       
       const updateQty = (id, delta) => setCart(cart.map(item => item.id === id ? { ...item, qty: Math.max(0, item.qty + delta) } : item));
       const totalCajas = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -651,6 +649,7 @@
         if (totalCajas === 0) return;
         onSave({
           date: new Date().toISOString(),
+          deliveryDate: deliveryDate,
           items: cart.filter(i => i.qty > 0).map(i => ({ name: i.name, qty: i.qty })),
           totalItems: totalCajas
         });
@@ -669,7 +668,19 @@
           </div>
 
           <div className="p-4 flex-1">
-            <div className="flex flex-col gap-3 mt-2">
+            <div className="mb-2 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
+              <Input 
+                type="date" 
+                label="Fecha de Entrega Acordada *" 
+                iconClass="fa-solid fa-calendar-days" 
+                value={deliveryDate} 
+                onChange={(e) => setDeliveryDate(e.target.value)}
+                required
+              />
+            </div>
+
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4 ml-1">Productos a solicitar</h3>
+            <div className="flex flex-col gap-3">
               {cart.map(item => (
                 <div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl border shadow-sm ${item.color}`}>
                   <div className="font-bold text-sm max-w-[50%]">{item.name}</div>

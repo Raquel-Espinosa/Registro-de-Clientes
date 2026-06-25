@@ -7,46 +7,125 @@
   <title>AgroVentas Huevo</title>
   
   <!-- Tailwind CSS para el diseño -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com" id="cdn-tailwind"></script>
   
-  <!-- FontAwesome para los íconos -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- FontAwesome para los íconos (Sustituto de Lucide en HTML) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" id="cdn-fontawesome">
   
   <!-- React y ReactDOM -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" id="cdn-react"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" id="cdn-reactdom"></script>
   
   <!-- Babel para compilar JSX en el navegador -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" id="cdn-babel"></script>
 
   <style>
     body { 
       background-color: #f3f4f6; 
-      color: #1f2937;
+      color: #1f2937; /* Fuerza un color oscuro por defecto para evitar letras blancas */
       font-family: system-ui, -apple-system, sans-serif; 
     }
+    /* Animaciones suaves */
     .animate-in { animation: fadeIn 0.3s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
   <div id="root">
-    <!-- Mensaje de respaldo por si tarda en cargar -->
-    <div style="padding: 40px; text-align: center; font-family: sans-serif; color: #333; margin-top: 20vh;">
-      <h2>⏳ Cargando aplicación...</h2>
-      <p style="margin-top: 10px; color: #666;">Si esta pantalla no desaparece, comprueba tu conexión a internet.</p>
+    <!-- Mensaje de respaldo por si el navegador bloquea los scripts -->
+    <div id="fallback-loader" style="padding: 40px; text-align: center; font-family: sans-serif; color: #333; margin-top: 15vh;">
+      <h2 id="fallback-title">⏳ Cargando aplicación...</h2>
+      <p id="fallback-message" style="margin-top: 10px; color: #666;">Esto debería tomar solo 1-2 segundos. Necesita descargar los íconos y el diseño la primera vez que se abre.</p>
+      <button id="fallback-retry" onclick="location.reload()" style="display:none; margin-top: 20px; padding: 10px 24px; background:#f59e0b; color:white; border:none; border-radius:10px; font-weight:600; font-size:15px;">
+        Reintentar
+      </button>
     </div>
   </div>
 
-  <script type="text/babel">
+  <script>
+    // --- DIAGNÓSTICO DE CARGA ---
+    // Detecta cuál recurso externo falló y avisa claramente al usuario,
+    // en vez de quedarse atascado en "Cargando..." sin explicación.
+    var __failedResources = [];
+    var __lastError = null;
+    var __cdnNames = {
+      'cdn-tailwind': 'Tailwind CSS',
+      'cdn-fontawesome': 'FontAwesome',
+      'cdn-react': 'React',
+      'cdn-reactdom': 'ReactDOM',
+      'cdn-babel': 'Babel'
+    };
+    Object.keys(__cdnNames).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('error', function () {
+          __failedResources.push(__cdnNames[id]);
+        });
+      }
+    });
+
+    // Captura cualquier error de JS en tiempo de ejecución (incluido fallos
+    // de Babel al transpilar el JSX), para mostrar el detalle real en vez
+    // de un mensaje genérico.
+    window.addEventListener('error', function (e) {
+      __lastError = (e && (e.message || (e.error && e.error.message))) || 'Error desconocido';
+    });
+
+    function __showFallbackError(message) {
+      var titleEl = document.getElementById('fallback-title');
+      var msgEl = document.getElementById('fallback-message');
+      var retryEl = document.getElementById('fallback-retry');
+      if (titleEl) titleEl.textContent = '⚠️ No se pudo cargar la aplicación';
+      if (msgEl) msgEl.innerHTML = message;
+      if (retryEl) retryEl.style.display = 'inline-block';
+    }
+
+    // Si después de 8 segundos React no ha reemplazado el contenido del
+    // div#root (es decir, sigue mostrando el loader de respaldo), algo
+    // falló al cargar. Mostramos el motivo concreto.
+    setTimeout(function () {
+      var loader = document.getElementById('fallback-loader');
+      if (!loader) return; // React ya renderizó y reemplazó el contenido: todo bien.
+
+      if (__failedResources.length > 0) {
+        __showFallbackError(
+          'No se pudo descargar: <b>' + __failedResources.join(', ') + '</b>.<br><br>' +
+          'Esto suele pasar por: conexión a internet inestable, un firewall/antivirus bloqueando el sitio, ' +
+          'o el modo "Ahorro de datos" del navegador. Revisa tu conexión e intenta de nuevo.'
+        );
+      } else if (typeof React === 'undefined') {
+        __showFallbackError(
+          'La librería <b>React</b> no llegó a cargar (posiblemente bloqueada por tu red o navegador).<br><br>' +
+          'Intenta con otra red (datos móviles / WiFi) o desactiva temporalmente bloqueadores de contenido.'
+        );
+      } else if (typeof Babel === 'undefined') {
+        __showFallbackError(
+          'La librería <b>Babel</b> no llegó a cargar (posiblemente bloqueada por tu red o navegador).<br><br>' +
+          'Intenta con otra red (datos móviles / WiFi) o desactiva temporalmente bloqueadores de contenido.'
+        );
+      } else if (__lastError) {
+        __showFallbackError(
+          'Detalle técnico: <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;word-break:break-all;">' +
+          __lastError + '</code>'
+        );
+      } else {
+        __showFallbackError(
+          'Los archivos cargaron pero la aplicación no pudo iniciar. Abre la consola del navegador (si puedes) para más detalles, o reintenta.'
+        );
+      }
+    }, 8000);
+  </script>
+
+  <script type="text/plain" id="app-source">
     const { useState, useEffect, useRef } = React;
 
     // ==========================================
     // ⚠️ CONFIGURACIÓN DE TU BASE DE DATOS ⚠️
     // ==========================================
-    // Pega aquí la URL que te dio Google Apps Script
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbypCWEjWA156Il5vdTy0S2cuV_fEUyvCR6S8aqoh6B4-YLW72by7ez0cKYrOE7iJacc0Q/exec";
+    // Pega aquí la URL que te dio Google Apps Script en el Paso 1
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwikUirmOmbz23AheKIoeELWMTH14oAsB5m5N8SXp7yqj0UVyAbonY4TsQYQzb1M4kUOA/exec";
     // ==========================================
+
 
     // --- COMPONENTES UI REUTILIZABLES ---
     const Button = ({ children, onClick, variant = 'primary', className = '', type = 'button', disabled = false }) => {
@@ -97,7 +176,7 @@
 
     // --- APP PRINCIPAL ---
     function App() {
-      // Cargar datos locales al inicio
+      // INICIO DEL CAMBIO: Leer datos guardados al abrir la app
       const [prospects, setProspects] = useState(() => {
         try {
           const savedData = localStorage.getItem('agroventas_data');
@@ -107,11 +186,12 @@
         }
       });
 
-      // Guardar datos locales en cada cambio
+      // INICIO DEL CAMBIO: Guardar automáticamente en el celular cada que haya un cambio
       useEffect(() => {
         try {
           localStorage.setItem('agroventas_data', JSON.stringify(prospects));
         } catch (error) {
+          // Si se llena la memoria de 5MB del navegador, guardamos todo pero sin las fotos locales (que pesan más)
           console.warn("Memoria local llena, guardando versión ligera...");
           const prospectsWithoutPhotos = prospects.map(p => ({ ...p, photoBase64: null }));
           localStorage.setItem('agroventas_data', JSON.stringify(prospectsWithoutPhotos));
@@ -129,6 +209,7 @@
 
       const handleSaveOrder = async (order, prospect) => {
         try {
+          // Actualizar UI Localmente
           const updatedProspects = prospects.map(p => {
             if (p.id === prospect.id) {
               return { ...p, orders: [order, ...(p.orders || [])] };
@@ -139,16 +220,17 @@
           setCurrentView('list');
           showNotification('Enviando pedido a la nube...', 'warning');
 
-          if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith("http")) {
+          // Enviar a Google Sheets
+          if (APPS_SCRIPT_URL !== "PEGAR_AQUI_TU_URL_DE_APPS_SCRIPT") {
             const orderText = order.items.map(i => `${i.qty}x ${i.name}`).join(' | ');
             const payload = {
               action: 'add_order',
               prospectId: prospect.id,
               businessName: prospect.businessName,
-              orderDetails: `${order.totalItems} cajas en total: ` + orderText,
-              deliveryDate: order.deliveryDate
+              orderDetails: `${order.totalItems} cajas en total: ` + orderText
             };
             
+            // Eliminamos mode: 'no-cors' para detectar errores de bloqueo reales
             await fetch(APPS_SCRIPT_URL, {
               method: 'POST',
               body: JSON.stringify(payload)
@@ -175,13 +257,14 @@
                    />;
           case 'add':
             return <AddProspect 
-                     prospects={prospects}
                      onSave={async (prospect) => {
+                       // Actualizar Local
                        setProspects([prospect, ...prospects]);
                        setCurrentView('list');
-                       showNotification('Subiendo datos y foto a la nube...', 'warning');
+                       showNotification('Subiendo datos y foto a Google Drive...', 'warning');
                        
-                       if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith("http")) {
+                       // Subir a la Nube (Google Script)
+                       if (APPS_SCRIPT_URL !== "PEGAR_AQUI_TU_URL_DE_APPS_SCRIPT") {
                           try {
                             const payload = { action: 'add_prospect', ...prospect };
                             await fetch(APPS_SCRIPT_URL, {
@@ -220,6 +303,8 @@
       return (
         <div className="min-h-screen flex justify-center text-gray-900">
           <div className="w-full max-w-md bg-white shadow-2xl relative flex flex-col h-screen overflow-hidden">
+            
+            {/* Cabecera */}
             <header className="bg-amber-500 text-white px-4 py-4 shadow-md z-10 flex-shrink-0 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="bg-white text-amber-500 w-8 h-8 rounded-lg flex items-center justify-center">
@@ -234,6 +319,7 @@
               )}
             </header>
 
+            {/* Notificaciones */}
             {notification && (
               <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 w-[90%] animate-in">
                 <div className={`px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 ${
@@ -333,14 +419,13 @@
     };
 
     // --- VISTA: AGREGAR PROSPECTO ---
-    const AddProspect = ({ prospects, onSave, onCancel, showNotification }) => {
-      const [formData, setFormData] = useState({ contactName: '', businessName: '', phone: '', businessType: '', addressNotes: '' });
+    const AddProspect = ({ onSave, onCancel, showNotification }) => {
+      const [formData, setFormData] = useState({ contactName: '', businessName: '', phone: '', businessType: '' });
       const [location, setLocation] = useState(null);
       const [locating, setLocating] = useState(false);
       const [photoBase64, setPhotoBase64] = useState(null);
       const [isSaving, setIsSaving] = useState(false);
       const fileInputRef = useRef(null);
-      const galleryInputRef = useRef(null);
 
       const businessTypes = [
         { value: 'Abarrotería', label: 'Abarrotería / Miscelánea' },
@@ -386,7 +471,7 @@
             img.src = reader.result;
             img.onload = () => {
               const canvas = document.createElement('canvas');
-              const MAX_WIDTH = 800; 
+              const MAX_WIDTH = 800; // Comprimir la imagen para que Google Sheets no la rechace
               let width = img.width;
               let height = img.height;
               
@@ -399,6 +484,7 @@
               const ctx = canvas.getContext('2d');
               ctx.drawImage(img, 0, 0, width, height);
               
+              // Guardar la imagen optimizada (jpeg al 60% de calidad)
               const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
               setPhotoBase64(compressedBase64); 
               showNotification("Fotografía lista", "success"); 
@@ -409,45 +495,17 @@
         }
       };
 
-      const handleSubmit = async (e) => {
+      const handleSubmit = (e) => {
         e.preventDefault();
         if (!formData.businessName || !formData.businessType) {
           showNotification('Nombre y tipo de negocio obligatorios', 'error'); return;
         }
-        
         setIsSaving(true);
-        
-        if (formData.phone) {
-          const isDuplicateLocal = prospects.some(p => p.phone === formData.phone);
-          if (isDuplicateLocal) {
-            showNotification('Ese cliente ya está registrado en tu celular', 'error');
-            setIsSaving(false);
-            return;
-          }
-
-          if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith("http")) {
-            try {
-              showNotification('Verificando base de datos central...', 'warning');
-              const checkUrl = `${APPS_SCRIPT_URL}?action=check_phone&phone=${encodeURIComponent(formData.phone)}`;
-              const response = await fetch(checkUrl);
-              const result = await response.json();
-
-              if (result.exists) {
-                showNotification('El teléfono ya está registrado por otro vendedor', 'error');
-                setIsSaving(false);
-                return;
-              }
-            } catch (error) {
-              console.warn("Modo sin conexión o error de red", error);
-            }
-          }
-        }
-        
         const newProspect = {
           id: Date.now().toString(),
           ...formData,
           location,
-          photoBase64,
+          photoBase64, // Enviamos el Base64 completo
           createdAt: new Date().toISOString(),
           orders: []
         };
@@ -476,56 +534,38 @@
               <Input label="Teléfono (WhatsApp)" type="tel" iconClass="fa-solid fa-phone" placeholder="10 dígitos" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
             </div>
 
-            <div className="mb-2">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 mt-2">Ubicación Escrita</h3>
-              <Input label="Dirección / Referencias" iconClass="fa-solid fa-map-location-dot" placeholder="Ej. Mercado local 12, pasillo 3" value={formData.addressNotes} onChange={(e) => setFormData({...formData, addressNotes: e.target.value})} />
-            </div>
-
             <div className="mb-4">
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 mt-2">Evidencia y Ubicación</h3>
               <div className="grid grid-cols-2 gap-3">
-                <div onClick={handleGetLocation} className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-colors h-auto min-h-[8rem] ${location ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-300 bg-gray-50 text-gray-500'}`}>
+                <div onClick={handleGetLocation} className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-colors h-32 ${location ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-300 bg-gray-50 text-gray-500'}`}>
                   <i className={`fa-solid fa-location-dot text-3xl ${location ? 'text-green-500' : 'text-gray-400'}`}></i>
                   <span className="text-sm font-medium">{locating ? 'Buscando...' : location ? 'GPS Guardado' : 'Capturar GPS'}</span>
                   {location && <i className="fa-solid fa-circle-check absolute top-2 right-2 text-green-500"></i>}
                 </div>
 
-                <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-xl flex flex-col items-center justify-center text-center overflow-hidden relative h-auto min-h-[8rem]">
+                <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer overflow-hidden relative h-32">
                   {photoBase64 ? (
                     <>
                       <img src={photoBase64} alt="Fachada" className="w-full h-full object-cover absolute inset-0 opacity-80" />
-                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white p-2 backdrop-blur-sm">
-                        <span className="text-xs font-medium mb-3">Cambiar Foto</span>
-                        <div className="flex gap-6">
-                          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center hover:text-amber-400 transition-colors">
-                            <i className="fa-solid fa-camera text-2xl mb-1"></i>
-                          </button>
-                          <button type="button" onClick={() => galleryInputRef.current?.click()} className="flex flex-col items-center hover:text-blue-400 transition-colors">
-                            <i className="fa-solid fa-image text-2xl mb-1"></i>
-                          </button>
-                        </div>
+                      <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white p-2">
+                        <i className="fa-solid fa-camera text-2xl mb-1"></i>
+                        <span className="text-xs font-medium">Cambiar</span>
                       </div>
                     </>
                   ) : (
-                    <div className="p-2 flex flex-col w-full h-full justify-center gap-2">
-                      <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full bg-white border border-gray-200 shadow-sm rounded-lg py-2 text-xs font-medium text-gray-700 flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-                        <i className="fa-solid fa-camera text-amber-500 text-base"></i> Cámara
-                      </button>
-                      <button type="button" onClick={() => galleryInputRef.current?.click()} className="w-full bg-white border border-gray-200 shadow-sm rounded-lg py-2 text-xs font-medium text-gray-700 flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-                        <i className="fa-solid fa-image text-blue-500 text-base"></i> Galería
-                      </button>
+                    <div className="p-4 flex flex-col items-center justify-center text-gray-500 gap-2">
+                      <i className="fa-solid fa-camera text-3xl text-gray-400"></i>
+                      <span className="text-sm font-medium">Abrir Cámara</span>
                     </div>
                   )}
                 </div>
-                
                 <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" capture="environment" onChange={handlePhotoCapture} />
-                <input type="file" ref={galleryInputRef} style={{ display: 'none' }} accept="image/*" onChange={handlePhotoCapture} />
               </div>
             </div>
 
             <div className="mt-4 pt-4 border-t bg-white sticky bottom-0 z-10">
               <Button type="submit" disabled={isSaving} className="w-full text-lg py-3.5 shadow-amber-500/25 shadow-lg">
-                {isSaving ? 'Verificando y Guardando...' : 'Guardar Prospecto'}
+                {isSaving ? 'Guardando en la Nube...' : 'Guardar Prospecto'}
               </Button>
             </div>
           </form>
@@ -574,17 +614,11 @@
                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><i className="fa-solid fa-users"></i></div>
                 <div><p className="text-xs text-gray-500 font-medium">Encargado</p><p className="font-semibold">{prospect.contactName || 'N/A'}</p></div>
               </div>
-              <div className="flex items-start gap-3 mb-3">
+              <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 flex-shrink-0"><i className="fa-solid fa-phone"></i></div>
                 <div className="flex-1"><p className="text-xs text-gray-500 font-medium">Teléfono</p><p className="font-semibold">{prospect.phone || 'N/A'}</p></div>
                 {prospect.phone && <a href={`tel:${prospect.phone}`} className="p-2 bg-gray-100 rounded-lg text-gray-600"><i className="fa-solid fa-phone"></i></a>}
               </div>
-              {prospect.addressNotes && (
-                <div className="flex items-start gap-3 border-t pt-3 mt-1 border-gray-100">
-                  <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0"><i className="fa-solid fa-map-location-dot"></i></div>
-                  <div className="flex-1"><p className="text-xs text-gray-500 font-medium">Dirección / Referencias</p><p className="font-semibold text-sm">{prospect.addressNotes}</p></div>
-                </div>
-              )}
             </div>
 
             <div className="pb-10">
@@ -598,17 +632,10 @@
                 <div className="flex flex-col gap-3">
                   {prospect.orders.map((order, idx) => (
                     <div key={idx} className="bg-white p-4 rounded-2xl shadow-sm border border-l-4 border-l-amber-500">
-                      <div className="flex justify-between items-center mb-1 border-b pb-2">
+                      <div className="flex justify-between items-center mb-2 border-b pb-2">
                         <span className="text-sm font-semibold">{new Date(order.date).toLocaleDateString()}</span>
                         <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-md">{order.totalItems} cajas</span>
                       </div>
-                      
-                      {order.deliveryDate && (
-                        <div className="text-xs font-medium text-blue-600 bg-blue-50 inline-flex items-center gap-1 px-2 py-1 rounded mb-1 mt-1">
-                          <i className="fa-solid fa-calendar-day"></i> Entrega: {order.deliveryDate}
-                        </div>
-                      )}
-
                       <ul className="text-sm text-gray-600 space-y-1 mt-2">
                         {order.items.map((item, i) => (
                           <li key={i} className="flex justify-between"><span>{item.name}</span><span className="font-bold">{item.qty}</span></li>
@@ -630,17 +657,8 @@
         { id: 'b_g', name: 'Blanco - Grande', color: 'bg-white border-gray-200' },
         { id: 'b_m', name: 'Blanco - Mediano', color: 'bg-white border-gray-200' },
         { id: 'r_g', name: 'Rojo - Grande', color: 'bg-red-50 border-red-200 text-red-900' },
-        { id: 'r_m', name: 'Rojo - Mediano', color: 'bg-red-50 border-red-200 text-red-900' },
-        { id: 'pinto', name: 'Huevo Pinto', color: 'bg-orange-50 border-orange-200 text-orange-900' },
       ];
-      
       const [cart, setCart] = useState(catalog.map(p => ({ ...p, qty: 0 })));
-      
-      const [deliveryDate, setDeliveryDate] = useState(() => {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow.toISOString().split('T')[0];
-      });
       
       const updateQty = (id, delta) => setCart(cart.map(item => item.id === id ? { ...item, qty: Math.max(0, item.qty + delta) } : item));
       const totalCajas = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -649,7 +667,6 @@
         if (totalCajas === 0) return;
         onSave({
           date: new Date().toISOString(),
-          deliveryDate: deliveryDate,
           items: cart.filter(i => i.qty > 0).map(i => ({ name: i.name, qty: i.qty })),
           totalItems: totalCajas
         });
@@ -668,19 +685,7 @@
           </div>
 
           <div className="p-4 flex-1">
-            <div className="mb-2 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
-              <Input 
-                type="date" 
-                label="Fecha de Entrega Acordada *" 
-                iconClass="fa-solid fa-calendar-days" 
-                value={deliveryDate} 
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                required
-              />
-            </div>
-
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4 ml-1">Productos a solicitar</h3>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 mt-2">
               {cart.map(item => (
                 <div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl border shadow-sm ${item.color}`}>
                   <div className="font-bold text-sm max-w-[50%]">{item.name}</div>
@@ -708,6 +713,34 @@
     // Renderizar la App
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
+  </script>
+
+  <script>
+    // --- COMPILACIÓN MANUAL DEL JSX ---
+    // Compilamos el bloque anterior nosotros mismos con Babel.transform,
+    // forzando runtime "classic" (React.createElement). Esto evita que
+    // Babel genere "import { jsx } from 'react/jsx-runtime'", que rompe
+    // porque React aquí se carga como script clásico (UMD), no como
+    // módulo ES, y ese import no tiene de dónde resolverse.
+    (function () {
+      try {
+        var sourceEl = document.getElementById('app-source');
+        var sourceCode = sourceEl.textContent;
+
+        var result = Babel.transform(sourceCode, {
+          presets: [
+            ['react', { runtime: 'classic' }]
+          ]
+        });
+
+        var script = document.createElement('script');
+        script.text = result.code;
+        document.body.appendChild(script);
+      } catch (err) {
+        __lastError = (err && err.message) || 'Error al compilar el JSX';
+        console.error('Error compilando la app:', err);
+      }
+    })();
   </script>
 </body>
 </html>
